@@ -25,13 +25,9 @@ def animate(model, save=False):
         frame = eval_env.render()
         frames.append(frame)
 
-        if done:
+        if done or truncated:
             print(f'{total_reward = }')
             break
-
-        if truncated or (step == max_steps - 1 and total_reward < 0):
-            print(f'Не получилось за {max_steps} шагов')
-            return animate(model, save=save)
 
     fig, ax = plt.subplots()
     ax.axis('off')
@@ -53,8 +49,9 @@ def animate(model, save=False):
 
 def learn(save=False):
     n_envs = 16
-    n_steps = 16
+    n_steps = 64
     normalize_kwargs = {'norm_obs': True, 'norm_reward': False}
+    policy_kwargs = dict(net_arch=[64, 64])
 
     envs = DummyVecEnv([lambda: gym.make(ENV_ID) for _ in range(n_envs)])
     envs = VecNormalize(envs, **normalize_kwargs)
@@ -62,18 +59,19 @@ def learn(save=False):
     model = PPO(
         policy='MlpPolicy',
         env=envs,
-        ent_coef=0.0,
+        policy_kwargs=policy_kwargs,
+        ent_coef=0.001,
         gae_lambda=0.98,
         gamma=0.99,
         n_steps=n_steps,
-        n_epochs=4,
-        batch_size=256,  # так как 16*16=256
+        n_epochs=10,
+        batch_size=n_envs*n_steps,
         tensorboard_log="./ppo_mountaincar_tensorboard/",
         verbose=1,
         device='cuda'
     )
 
-    model.learn(total_timesteps=1_000_000)
+    model.learn(total_timesteps=500_000)
     if save:
         model.save("ppo_mountaincar")
 
